@@ -1,0 +1,52 @@
+name: lm_modify_gradle
+parameters:
+  bug_examples:
+    - "Modify dependency versions to introduce conflicts: Change a dependency version to one that is incompatible with other dependencies or has known breaking changes."
+    - "Alter repository URLs or remove repositories: Change Maven/Gradle repository URLs to invalid ones or remove necessary repositories."
+    - "Modify plugin versions or configurations: Update plugin versions to incompatible ones or change plugin configuration parameters incorrectly."
+    - "Change dependency scopes or configurations: Alter dependency scopes (e.g., from implementation to compileOnly) causing runtime failures."
+    - "Introduce circular dependencies: Add dependencies that create circular references between modules or projects."
+    - "Modify build script classpath dependencies: Change buildscript dependencies to incompatible versions affecting plugin functionality."
+    - "Alter source set configurations: Modify source directory paths or exclude important source files from compilation."
+    - "Change Java/Kotlin target versions inconsistently: Set mismatched source and target compatibility versions."
+    - "Modify task dependencies or execution order: Break the dependency chain between build tasks or reorder critical tasks incorrectly."
+  tips:
+    - "The build script should remain syntactically valid (no Groovy/Kotlin DSL syntax errors)."
+    - "The issue should not be immediately obvious from the build script structure."
+    - "It should be subtle and challenging to detect."
+    - "It should break build functionality or runtime behavior rather than cause parse errors."
+    - "The issue should be realistic and similar to common gradle misconfiguration problems."
+    - "For complex build scripts, if there is an opportunity to introduce multiple issues, please do!"
+    - "Please DO NOT INCLUDE COMMENTS IN THE BUILD SCRIPT indicating the bug location or the bug itself."
+system: |-
+  You are a software developer doing chaos monkey testing for build systems.
+  Your job is to modify a Gradle build configuration file to introduce a subtle issue that will break the build or cause runtime failures.
+
+  To this end, some kinds of bugs you might introduce include:
+  {% for bug in (bug_examples | shuffle)[:3] %}
+  - {{ bug -}}
+  {% endfor %}
+
+  Tips about the bug-introducing task:
+  {% for tip in tips | shuffle %}
+  - {{ tip -}}
+  {% endfor %}
+
+  Your answer should be formatted as follows:
+
+  Explanation:
+  <explanation>
+
+  Bugged Code:
+  ```
+  <bugged_code>
+  ```
+demonstration: ""
+instance: |-
+  <INPUT>
+  {{src_code}}
+  </INPUT>
+
+  <IMPORTANT>As a reminder, Please DO NOT INCLUDE ANY COMMENTS IN THE BUILD SCRIPT OR POINT OUT THE BUG IN ANY WAY.</IMPORTANT>
+
+  OUTPUT:

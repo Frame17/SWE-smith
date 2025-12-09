@@ -12,6 +12,7 @@ from . import c
 from . import cpp
 from . import csharp
 from . import java
+from . import kotlin
 from . import javascript
 from . import php
 from . import python

@@ -5,30 +5,34 @@ Usage: python -m swesmith.bug_gen.llm.modify \
     --n_bugs <n_bugs> \
     --config_file <config_file> \
     --model <model> \
+    [--entity_filter <filter_name>] \
     repo  # e.g., tkrajina__gpxpy.09fc46b3
 
 Where model follows the litellm format.
 
-Example:
 
 python -m swesmith.bug_gen.llm.modify tkrajina__gpxpy.09fc46b3 --config_file configs/bug_gen/class_basic.yml --model claude-3-7-sonnet-20250219 --n_bugs 1
 """
 
 import argparse
 import dataclasses
-import shutil
-import jinja2
 import json
-import litellm
 import logging
 import os
 import random
-import yaml
-
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import jinja2
+import litellm
+import yaml
 from dotenv import load_dotenv
 from litellm import completion
 from litellm.cost_calculator import completion_cost
+from tqdm.auto import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
+
+from swesmith.bug_gen.llm.filters import ENTITY_FILTERS
 from swesmith.bug_gen.llm.utils import PROMPT_KEYS, extract_code_block
 from swesmith.bug_gen.utils import (
     apply_code_change,
@@ -43,10 +47,6 @@ from swesmith.constants import (
     CodeEntity,
 )
 from swesmith.profiles import registry
-from tqdm.auto import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
-from typing import Any
-
 
 load_dotenv(dotenv_path=os.getenv("SWEFT_DOTENV_PATH"))
 
@@ -55,7 +55,7 @@ litellm.suppress_debug_info = True
 
 
 def gen_bug_from_code_lm(
-    candidate: CodeEntity, configs: dict, n_bugs: int, model: str
+        candidate: CodeEntity, configs: dict, n_bugs: int, model: str
 ) -> list[BugRewrite]:
     """
     Given the source code of a function, return `n` bugs with an LM
@@ -113,12 +113,13 @@ def gen_bug_from_code_lm(
 
 
 def main(
-    config_file: str,
-    model: str,
-    n_bugs: int,
-    repo: str,
-    n_workers: int = 1,
-    max_bugs: int = -1,
+        config_file: str,
+        model: str,
+        n_bugs: int,
+        repo: str,
+        n_workers: int = 1,
+        max_bugs: int = -1,
+        entity_filter: str | None = None,
 ):
     # Check arguments
     assert os.path.exists(config_file), f"{config_file} not found"
@@ -128,12 +129,27 @@ def main(
         f"Missing keys in {config_file}"
     )
 
+    # Initialize entity filter if specified
+    filter_instance = None
+    if entity_filter:
+        if entity_filter not in ENTITY_FILTERS:
+            raise ValueError(
+                f"Unknown entity filter: {entity_filter}. "
+                f"Available filters: {', '.join(ENTITY_FILTERS.keys())}"
+            )
+        filter_instance = ENTITY_FILTERS[entity_filter]()
+        print(f"Using entity filter: {entity_filter}")
+
     # Clone repository, identify valid candidates
     print("Cloning repository...")
     rp = registry.get(repo)
     rp.clone()
     print("Extracting candidates...")
+
     candidates = rp.extract_entities()
+    if filter_instance:
+        candidates = [c for c in candidates if filter_instance(c)]
+
     print(f"{len(candidates)} candidates found in {repo}")
     if not candidates:
         print(f"No candidates found in {repo}.")
@@ -250,6 +266,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-w", "--n_workers", type=int, help="Number of workers to use", default=1
+    )
+    parser.add_argument(
+        "--entity_filter",
+        type=str,
+        help=f"Entity filter to apply. Available filters: {', '.join(ENTITY_FILTERS.keys())}",
+        default=None,
     )
     args = parser.parse_args()
     main(**vars(args))
